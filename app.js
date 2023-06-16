@@ -3,6 +3,9 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
+const session = require('express-session');
+// requirie is returning another fnc, calling that fnc with parameter of session
+const FileStore = require('session-file-store')(session); 
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -34,11 +37,21 @@ app.set('view engine', 'jade');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser('12345-6789'));
+
+app.use(session({
+  name: 'session-id',
+  secret: '12345-6789',
+  saveUninitialized: false, // won't save a new sessions if updates are not   made and no cookie will be sent to client
+  resave: false,  // once session is created/updated/saved, it will continue to be resaved whenever a request is made for that session
+  store: new FileStore()
+}));
 
 // custom midleware function
 function auth(req, res, next) {
-  if (!req.signedCookies.user) {
+  console.log(req.session);
+
+
+  if (!req.session.user) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       const err = new Error('you are not authenticated');
@@ -52,7 +65,7 @@ function auth(req, res, next) {
     const user = auth[0];
     const pass = auth[1];
     if (user === 'admin' && pass === 'password') {
-      res.cookie('user', 'admin', { signed: true }); // create cookie and res to client
+      req.session.user = 'admin';
       return next(); // authorized
     } else {
       const err = new Error('You are not authenticated!');
@@ -61,7 +74,7 @@ function auth(req, res, next) {
       return next(err);
     }
   } else { //if there is a signed cookie
-    if (req.signedCookies.user === 'admin') {
+    if (req.session.user === 'admin') {
       return next();
     } else {
       const err = new Error('You are not authenticated!');
